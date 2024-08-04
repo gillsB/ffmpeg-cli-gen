@@ -1,6 +1,6 @@
 import sys
-from PySide6.QtCore import QProcess
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QLineEdit, QComboBox, QListWidget)
+from PySide6.QtCore import QProcess, QSize, Qt
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QLineEdit, QComboBox, QListWidget, QStyle, QFileDialog)
 import ffmpeg
 import re
 
@@ -25,6 +25,14 @@ class ProcessRunner(QWidget):
         input_layout.addWidget(self.input_file_label)
         input_layout.addWidget(self.input_file_line_edit)
         self.layout.addLayout(input_layout)
+
+        # Input file open File
+        input_folder_button = QPushButton(self)
+        input_folder_button.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        input_folder_button.setIconSize(QSize(16,16))
+        input_folder_button.setFocusPolicy(Qt.NoFocus)
+        input_folder_button.clicked.connect(self.input_folder_button_clicked)
+        input_layout.addWidget(input_folder_button)
 
         # Resolution
         resolution_layout = QHBoxLayout()
@@ -201,6 +209,12 @@ class ProcessRunner(QWidget):
         self.stderr_output = ""  # Clear stderr output for the next process
         self.current_command_index += 1
         self.start_next_process()
+
+    def input_folder_button_clicked(self):
+        file_dialog = QFileDialog()
+        if file_dialog.exec():
+            selected_file = file_dialog.selectedFiles()[0]
+            self.input_file_line_edit.setText(selected_file)  
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
