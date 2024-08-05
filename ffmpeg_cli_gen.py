@@ -164,7 +164,15 @@ class ProcessRunner(QWidget):
             self.status_label.setText("Status: Could not find input file path.")
             return
         
-        self.current_name = self.output_file_line_edit.text()
+        # Use regular expression to find the last quoted argument, which should be the output file path
+        output_file_match = re.findall(r'"([^"]+)"', command_str)
+        if output_file_match:
+            output_file_path = output_file_match[-1]
+        else:
+            output_file_path = "unknown"
+            return
+        
+        self.current_name = output_file_path
 
         self.frame_count, self.vid_duration = self.get_video_info(input_file_path)
 
