@@ -188,10 +188,21 @@ class ProcessRunner(QWidget):
 
         if video_stream is None:
             raise ValueError("No video stream found")
+        
 
         # Extract frame count and duration
-        frame_count = int(video_stream['nb_frames'])
-        duration = float(video_stream['duration'])
+        try:
+            frame_count = int(video_stream['nb_frames'])
+            duration = float(video_stream['duration'])
+        except KeyError:
+            print("problem getting frames")
+            frame_count = 0
+            duration = 0
+        except Exception as e:
+            print(f"Error: {e}")
+            frame_count = 0
+            duration = 0
+
 
         return frame_count, duration
     
@@ -206,7 +217,9 @@ class ProcessRunner(QWidget):
         # Update the status label with the last line from stderr
         lines = self.stderr_output.splitlines()
         cur_frame = self.get_frame(lines[-1])
-        if cur_frame is not None and self.frame_count is not None:
+        if self.frame_count == 0:
+            self.status_label.setText(f"Status: {lines[-1]}")
+        elif cur_frame is not None and self.frame_count is not None:
             new_message = f"progress = {round((cur_frame / self.frame_count) * 100, 2)}% "
             new_message += lines[-1]
             self.status_label.setText(f"Status: {new_message}")
