@@ -3,6 +3,7 @@ from PySide6.QtCore import QProcess, QSize, Qt
 from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QLineEdit, QComboBox, QListWidget, QStyle, QFileDialog)
 import ffmpeg
 import re
+import shlex
 
 class ProcessRunner(QWidget):
     def __init__(self):
@@ -116,13 +117,13 @@ class ProcessRunner(QWidget):
         bufsize = self.bufsize_line_edit.text()
 
         command = [
-            "ffmpeg", "-i", input_file,
-            "-vf", f"scale={resolution}",
+            "ffmpeg", "-i", f'"{input_file}"',
+            "-vf", f'"scale={resolution}"',
             "-c:v", "h264_amf",
             "-b:v", bitrate,
             "-maxrate", max_bitrate,
             "-bufsize", bufsize,
-            output_file
+            f'"{output_file}"'
         ]
         return command
 
@@ -153,11 +154,19 @@ class ProcessRunner(QWidget):
             return
 
         command_str = self.queue[self.current_command_index]
-        command_parts = command_str.split()
+        command_parts = shlex.split(command_str)  # Use shlex.split to handle spaces correctly
 
-        self.current_name = command_parts[13]
+        # Use regular expression to find the input file path between '-i' and '-vf'
+        input_file_match = re.search(r'-i\s+"?([^"]+)"?\s+-vf', command_str)
+        if input_file_match:
+            input_file_path = input_file_match.group(1)
+        else:
+            self.status_label.setText("Status: Could not find input file path.")
+            return
         
-        self.frame_count, self.vid_duration = self.get_video_info(command_parts[2])
+        self.current_name = self.output_file_line_edit.text()
+
+        self.frame_count, self.vid_duration = self.get_video_info(input_file_path)
 
         self.process = QProcess()
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
@@ -189,14 +198,10 @@ class ProcessRunner(QWidget):
         # Update the status label with the last line from stderr
         lines = self.stderr_output.splitlines()
         cur_frame = self.get_frame(lines[-1])
-        if cur_frame != None and self.frame_count != None:
-            
-            new_message = f"progress = {round((float) (cur_frame / self.frame_count)* 100, 2)}% "
+        if cur_frame is not None and self.frame_count is not None:
+            new_message = f"progress = {round((cur_frame / self.frame_count) * 100, 2)}% "
             new_message += lines[-1]
             self.status_label.setText(f"Status: {new_message}")
-
-
-
 
     def get_frame(self, message):
         match = re.search(r'frame=\s*(\d+)', message)
