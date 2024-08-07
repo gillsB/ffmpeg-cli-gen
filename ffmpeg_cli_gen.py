@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtCore import QProcess, QSize, Qt
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QLineEdit, QComboBox, QListWidget, QStyle, QFileDialog)
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QLineEdit, QComboBox, QListWidget, QStyle, QFileDialog, QTabWidget)
 import ffmpeg
 import re
 import shlex
@@ -44,6 +44,13 @@ class ProcessRunner(QWidget):
         resolution_layout.addWidget(self.resolution_combo)
         self.layout.addLayout(resolution_layout)
 
+        # Tabs for Bitrate and Quality
+        self.tabs = QTabWidget()
+
+        # Bitrate Tab
+        bitrate_tab = QWidget()
+        bitrate_tab_layout = QVBoxLayout()
+
         # Bitrate
         bitrate_layout = QHBoxLayout()
         self.bitrate_label = QLabel("Bitrate:")
@@ -52,7 +59,7 @@ class ProcessRunner(QWidget):
         self.bitrate_line_edit.setText("8M")  # Default value
         bitrate_layout.addWidget(self.bitrate_label)
         bitrate_layout.addWidget(self.bitrate_line_edit)
-        self.layout.addLayout(bitrate_layout)
+        bitrate_tab_layout.addLayout(bitrate_layout)
 
         # Max Bitrate
         max_bitrate_layout = QHBoxLayout()
@@ -62,7 +69,7 @@ class ProcessRunner(QWidget):
         self.max_bitrate_line_edit.setText("10M")  # Default value
         max_bitrate_layout.addWidget(self.max_bitrate_label)
         max_bitrate_layout.addWidget(self.max_bitrate_line_edit)
-        self.layout.addLayout(max_bitrate_layout)
+        bitrate_tab_layout.addLayout(max_bitrate_layout)
 
         # Buffer Size
         bufsize_layout = QHBoxLayout()
@@ -72,7 +79,55 @@ class ProcessRunner(QWidget):
         self.bufsize_line_edit.setText("16M")  # Default value
         bufsize_layout.addWidget(self.bufsize_label)
         bufsize_layout.addWidget(self.bufsize_line_edit)
-        self.layout.addLayout(bufsize_layout)
+        bitrate_tab_layout.addLayout(bufsize_layout)
+
+        bitrate_tab.setLayout(bitrate_tab_layout)
+        self.tabs.addTab(bitrate_tab, "Bitrate")
+
+        # Quality Tab
+        quality_tab = QWidget()
+        quality_layout = QVBoxLayout()
+
+        self.quality_note = QLabel(
+            "Works Similar to -crf in other ffmpeg rendering\n"
+            "-Lower value = better quality, larger files\n"
+            "-High: 18-22, Medium: 23-28, Low: 30+\n"
+        )
+        self.quality_note.setWordWrap(True)
+        quality_layout.addWidget(self.quality_note)
+
+
+        # I-frames
+        i_frames_layout = QHBoxLayout()
+        self.i_frames_label = QLabel("i-frames:")
+        self.i_frames_line_edit = QLineEdit()
+        self.i_frames_line_edit.setText("23")
+        i_frames_layout.addWidget(self.i_frames_label)
+        i_frames_layout.addWidget(self.i_frames_line_edit)
+        quality_layout.addLayout(i_frames_layout)
+
+        # P-frames
+        p_frames_layout = QHBoxLayout()
+        self.p_frames_label = QLabel("p-frames:")
+        self.p_frames_line_edit = QLineEdit()
+        self.p_frames_line_edit.setText("24")
+        p_frames_layout.addWidget(self.p_frames_label)
+        p_frames_layout.addWidget(self.p_frames_line_edit)
+        quality_layout.addLayout(p_frames_layout)
+
+        # B-frames
+        b_frames_layout = QHBoxLayout()
+        self.b_frames_label = QLabel("b-frames:")
+        self.b_frames_line_edit = QLineEdit()
+        self.b_frames_line_edit.setText("25")
+        b_frames_layout.addWidget(self.b_frames_label)
+        b_frames_layout.addWidget(self.b_frames_line_edit)
+        quality_layout.addLayout(b_frames_layout)
+
+        quality_tab.setLayout(quality_layout)
+        self.tabs.addTab(quality_tab, "Quality")
+
+        self.layout.addWidget(self.tabs)
 
         # Output File
         output_layout = QHBoxLayout()
@@ -110,7 +165,7 @@ class ProcessRunner(QWidget):
         self.setWindowTitle('QProcess Example')
         self.resize(600, 400)
 
-    def build_ffmpeg_command(self, input_file, output_file):
+    def build_ffmpeg_bitrate(self, input_file, output_file):
         resolution = self.resolution_combo.currentText()
         bitrate = self.bitrate_line_edit.text()
         max_bitrate = self.max_bitrate_line_edit.text()
@@ -126,6 +181,23 @@ class ProcessRunner(QWidget):
             f'"{output_file}"'
         ]
         return command
+    def build_ffmpeg_quality(self, input_file, output_file):
+        resolution = self.resolution_combo.currentText()
+        qp_i = self.i_frames_line_edit.text()
+        qp_p = self.p_frames_line_edit.text()
+        qp_b = self.b_frames_line_edit.text()
+
+        command = [
+            "ffmpeg", "-i", f'"{input_file}"',
+            "-vf", f'"scale={resolution}"',
+            "-c:v", "h264_amf",
+            "-rc", "cqp",
+            "-qp_i", qp_i,
+            "-qp_p", qp_p,
+            "-qp_b", qp_b,
+            f'"{output_file}"'
+        ]
+        return command
 
     def add_to_queue(self):
         input_file = self.input_file_line_edit.text()
@@ -135,7 +207,19 @@ class ProcessRunner(QWidget):
             self.status_label.setText("Status: Please provide input and output files.")
             return
 
-        command = self.build_ffmpeg_command(input_file, output_file)
+        selected_tab = self.tabs.currentIndex()
+        if selected_tab == 0:
+            self.handle_bitrate_tab(input_file, output_file)
+        elif selected_tab == 1:
+            self.handle_quality_tab(input_file, output_file)
+
+    
+    def handle_bitrate_tab(self, input_file, output_file):
+        command = self.build_ffmpeg_bitrate(input_file, output_file)
+        command_str = " ".join(command)
+        self.queue_list_widget.addItem(command_str)
+    def handle_quality_tab(self, input_file, output_file):
+        command = self.build_ffmpeg_quality(input_file, output_file)
         command_str = " ".join(command)
         self.queue_list_widget.addItem(command_str)
     
